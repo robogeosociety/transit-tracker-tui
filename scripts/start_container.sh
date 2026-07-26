@@ -80,6 +80,13 @@ else
 fi
 
 # ---- Run container ----
+# NOTE: the optional mount/network arrays below are expanded as
+# ${ARR[@]+"${ARR[@]}"}, not the usual "${ARR[@]}". Under macOS's system bash
+# (3.2) with `set -u`, expanding an EMPTY array the normal way is an "unbound
+# variable" fatal error. That went unnoticed while InfluxDB was always up —
+# INFLUX_NET_ARGS was never empty. InfluxDB was retired 2026-07-22, so both
+# Influx arrays are now always empty and `--detach` died on line 94 before
+# `docker run` ever ran. Do not "simplify" these back.
 if [ "$DETACH" = true ]; then
     echo "Starting container '$CONTAINER_NAME' (detached, restart=always)..."
     docker run -d \
@@ -90,9 +97,9 @@ if [ "$DETACH" = true ]; then
         -p "$HTTP_PORT:$HTTP_PORT" \
         -v "$PROFILES_DIR:/config/profiles:ro" \
         -v "$SERVICE_YAML:/config/service.yaml" \
-        "${GTFS_MOUNT[@]}" \
-        "${INFLUX_NET_ARGS[@]}" \
-        "${INFLUX_MOUNT[@]}" \
+        ${GTFS_MOUNT[@]+"${GTFS_MOUNT[@]}"} \
+        ${INFLUX_NET_ARGS[@]+"${INFLUX_NET_ARGS[@]}"} \
+        ${INFLUX_MOUNT[@]+"${INFLUX_MOUNT[@]}"} \
         -e PROFILES_DIR=/config/profiles \
         -e SERVICE_SETTINGS_PATH=/config/service.yaml \
         -e TZ=America/Los_Angeles \
@@ -123,9 +130,9 @@ else
         -p "$HTTP_PORT:$HTTP_PORT" \
         -v "$PROFILES_DIR:/config/profiles:ro" \
         -v "$SERVICE_YAML:/config/service.yaml" \
-        "${GTFS_MOUNT[@]}" \
-        "${INFLUX_NET_ARGS[@]}" \
-        "${INFLUX_MOUNT[@]}" \
+        ${GTFS_MOUNT[@]+"${GTFS_MOUNT[@]}"} \
+        ${INFLUX_NET_ARGS[@]+"${INFLUX_NET_ARGS[@]}"} \
+        ${INFLUX_MOUNT[@]+"${INFLUX_MOUNT[@]}"} \
         -e PROFILES_DIR=/config/profiles \
         -e SERVICE_SETTINGS_PATH=/config/service.yaml \
         -e TZ=America/Los_Angeles \
