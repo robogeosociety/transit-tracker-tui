@@ -17,10 +17,29 @@ IMAGE_NAME="transit-tracker"
 CONTAINER_NAME="transit-tracker"
 WS_PORT=8000
 HTTP_PORT=8080
-PROFILES_DIR="$PROJECT_DIR/.local"
-SERVICE_YAML="$PROJECT_DIR/.local/service.yaml"
-GTFS_DB="$PROJECT_DIR/data/gtfs_index.sqlite"
-INFLUX_ENV_FILE="$PROJECT_DIR/.local/.env.influx"
+# ---- Runtime data location ----
+# Bind mounts must not point at an external volume. OrbStack shares /Volumes/*
+# into its Linux VM, and that sharing layer has wedged the whole volume —
+# readdir returns EINTR while SMART stays clean (robogeosociety/infra#25).
+# Keeping every bind on the internal disk is what lets that sharing be turned
+# off entirely.
+#
+# The repo stays the source of truth; scripts/sync_runtime.sh copies config and
+# the GTFS index into TT_RUNTIME_DIR. Falls back to the project dir when the
+# runtime dir isn't seeded — fresh clones, other machines, foreground dev runs.
+TT_RUNTIME_DIR="${TT_RUNTIME_DIR:-$HOME/.local/share/transit-tracker}"
+
+if [ -d "$TT_RUNTIME_DIR/config" ]; then
+    RUNTIME_SRC="$TT_RUNTIME_DIR"
+    PROFILES_DIR="$TT_RUNTIME_DIR/config"
+    GTFS_DB="$TT_RUNTIME_DIR/data/gtfs_index.sqlite"
+else
+    RUNTIME_SRC="$PROJECT_DIR (repo fallback — run scripts/sync_runtime.sh)"
+    PROFILES_DIR="$PROJECT_DIR/.local"
+    GTFS_DB="$PROJECT_DIR/data/gtfs_index.sqlite"
+fi
+SERVICE_YAML="$PROFILES_DIR/service.yaml"
+INFLUX_ENV_FILE="$PROFILES_DIR/.env.influx"
 INFLUX_NETWORK="influxdb_default"
 DETACH=false
 
@@ -43,6 +62,14 @@ if [ ! -d "$PROFILES_DIR" ]; then
     echo "Error: Profiles directory not found: $PROFILES_DIR"
     exit 1
 fi
+
+echo "Runtime data: $RUNTIME_SRC"
+case "$PROFILES_DIR:$GTFS_DB" in
+    */Volumes/*)
+        echo "Warning: binding paths under /Volumes — OrbStack's share of external"
+        echo "  volumes is a known wedge source (infra#25). Run scripts/sync_runtime.sh."
+        ;;
+esac
 
 cd "$PROJECT_DIR"
 
