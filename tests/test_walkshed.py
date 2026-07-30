@@ -23,6 +23,7 @@ CONTOUR_MINUTES = [5, 10, 15]
 # GTFS station loading (same logic as notebook cell 1)
 # ---------------------------------------------------------------------------
 
+
 def load_stations(gtfs_dir: Path) -> list[dict]:
     trips_path = gtfs_dir / "40" / "trips.txt"
     stop_times_path = gtfs_dir / "40" / "stop_times.txt"
@@ -32,7 +33,9 @@ def load_stations(gtfs_dir: Path) -> list[dict]:
             pytest.skip(f"{p} not found — run scripts/download_gtfs.py first")
 
     with open(trips_path) as f:
-        trip_ids = {t["trip_id"] for t in csv.DictReader(f) if t["route_id"] in TARGET_ROUTES}
+        trip_ids = {
+            t["trip_id"] for t in csv.DictReader(f) if t["route_id"] in TARGET_ROUTES
+        }
     with open(stop_times_path) as f:
         stop_ids = {r["stop_id"] for r in csv.DictReader(f) if r["trip_id"] in trip_ids}
 
@@ -42,11 +45,13 @@ def load_stations(gtfs_dir: Path) -> list[dict]:
         for s in csv.DictReader(f):
             if s["stop_id"] in stop_ids and s["stop_name"] not in seen:
                 seen.add(s["stop_name"])
-                stations.append({
-                    "name": s["stop_name"],
-                    "lat": float(s["stop_lat"]),
-                    "lon": float(s["stop_lon"]),
-                })
+                stations.append(
+                    {
+                        "name": s["stop_name"],
+                        "lat": float(s["stop_lat"]),
+                        "lon": float(s["stop_lon"]),
+                    }
+                )
     return sorted(stations, key=lambda s: s["name"])
 
 
@@ -76,20 +81,27 @@ class TestLoadStations:
         stations = load_stations(GTFS_DIR)
         for s in stations:
             assert 47.0 < s["lat"] < 48.0, f"{s['name']} lat {s['lat']} out of range"
-            assert -123.0 < s["lon"] < -122.0, f"{s['name']} lon {s['lon']} out of range"
+            assert -123.0 < s["lon"] < -122.0, (
+                f"{s['name']} lon {s['lon']} out of range"
+            )
 
     def test_known_stations_present(self):
         stations = load_stations(GTFS_DIR)
         names = {s["name"] for s in stations}
         for expected in ["Westlake", "U District", "Capitol Hill"]:
-            assert any(expected in n for n in names), f"Expected station containing '{expected}'"
+            assert any(expected in n for n in names), (
+                f"Expected station containing '{expected}'"
+            )
 
 
 # ---------------------------------------------------------------------------
 # OSMnx walkshed computation (same logic as notebook cell 2)
 # ---------------------------------------------------------------------------
 
-def compute_walksheds(lat: float, lon: float, contour_minutes: list[int] = CONTOUR_MINUTES) -> list[dict]:
+
+def compute_walksheds(
+    lat: float, lon: float, contour_minutes: list[int] = CONTOUR_MINUTES
+) -> list[dict]:
     max_dist = max(contour_minutes) * WALK_SPEED_M_PER_MIN * 1.4
     G = graph.graph_from_point((lat, lon), dist=max_dist, network_type="walk")
     distance.add_edge_lengths(G)
@@ -104,10 +116,12 @@ def compute_walksheds(lat: float, lon: float, contour_minutes: list[int] = CONTO
         walkshed = unary_union(points.buffer(0.0012))
         # mapping() returns tuples; normalize to lists for JSON compat
         geom = json.loads(json.dumps(mapping(walkshed)))
-        results.append({
-            "minutes": minutes,
-            "geometry": geom,
-        })
+        results.append(
+            {
+                "minutes": minutes,
+                "geometry": geom,
+            }
+        )
     return results
 
 
@@ -137,8 +151,11 @@ class TestComputeWalksheds:
 
     def test_larger_contours_have_more_area(self, walksheds):
         from shapely.geometry import shape
+
         areas = {ws["minutes"]: shape(ws["geometry"]).area for ws in walksheds}
-        assert areas[5] < areas[10] < areas[15], f"Areas not monotonically increasing: {areas}"
+        assert areas[5] < areas[10] < areas[15], (
+            f"Areas not monotonically increasing: {areas}"
+        )
 
     def test_geometry_is_json_serializable(self, walksheds):
         for ws in walksheds:
@@ -148,15 +165,19 @@ class TestComputeWalksheds:
 
     def test_walkshed_contains_origin(self, walksheds):
         from shapely.geometry import Point, shape
+
         origin = Point(self.TEST_LON, self.TEST_LAT)
         for ws in walksheds:
             poly = shape(ws["geometry"])
-            assert poly.contains(origin), f"{ws['minutes']}-min walkshed doesn't contain origin"
+            assert poly.contains(origin), (
+                f"{ws['minutes']}-min walkshed doesn't contain origin"
+            )
 
 
 # ---------------------------------------------------------------------------
 # GeoJSON output structure
 # ---------------------------------------------------------------------------
+
 
 class TestGeoJSONStructure:
     """Validate the output GeoJSON shape that the Leaflet map expects."""
@@ -170,9 +191,20 @@ class TestGeoJSONStructure:
         }
 
     def test_feature_collection_structure(self):
-        feature = self.make_feature("Test Station", -122.33, 47.6, [
-            {"minutes": 5, "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]}},
-        ])
+        feature = self.make_feature(
+            "Test Station",
+            -122.33,
+            47.6,
+            [
+                {
+                    "minutes": 5,
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]],
+                    },
+                },
+            ],
+        )
         fc = {"type": "FeatureCollection", "features": [feature]}
         assert fc["type"] == "FeatureCollection"
         assert len(fc["features"]) == 1
@@ -197,7 +229,10 @@ class TestGeoJSONStructure:
             "geometry": {"type": "Point", "coordinates": [-122.33, 47.6]},
             "properties": {
                 "name": "Old Station",
-                "walkshed": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]},
+                "walkshed": {
+                    "type": "Polygon",
+                    "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]],
+                },
             },
         }
         props = old_feature["properties"]
@@ -208,9 +243,20 @@ class TestGeoJSONStructure:
         assert walksheds[0]["minutes"] == 10
 
     def test_roundtrip_json_serializable(self):
-        feature = self.make_feature("Roundtrip", -122.33, 47.6, [
-            {"minutes": 10, "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]}},
-        ])
+        feature = self.make_feature(
+            "Roundtrip",
+            -122.33,
+            47.6,
+            [
+                {
+                    "minutes": 10,
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]],
+                    },
+                },
+            ],
+        )
         fc = {"type": "FeatureCollection", "features": [feature]}
         serialized = json.dumps(fc)
         parsed = json.loads(serialized)
