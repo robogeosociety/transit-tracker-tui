@@ -75,6 +75,11 @@ def docker_container(docker_image):
         "--name", CONTAINER_NAME,
         "-p", f"{WS_HOST_PORT}:8000",
         "-p", f"{HTTP_HOST_PORT}:8080",
+        # This suite deliberately boots keyless and with no service.yaml, to
+        # prove the image comes up on a bare host. The startup guard in
+        # cli._assert_real_oba_key would otherwise (correctly) refuse to start
+        # on the shared public OBA key, so opt in explicitly here.
+        "-e", "TT_ALLOW_TEST_KEY=1",
     ]
     # Only mount config if it exists (CI environments won't have it)
     config_path = Path(CONFIG_MOUNT)
@@ -183,6 +188,7 @@ def _start_container(image, name, ws_port, http_port, *, gtfs_mount=False):
         "--name", name,
         "-p", f"{ws_port}:8000",
         "-p", f"{http_port}:8080",
+        "-e", "TT_ALLOW_TEST_KEY=1",  # see the fixture above
     ]
     config_path = Path(CONFIG_MOUNT)
     if config_path.exists():

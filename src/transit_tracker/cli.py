@@ -170,6 +170,48 @@ def _manage_service_launchctl(action: str):
             print(f"○ {label} is [red]stopped[/red]")
 
 
+SHARED_TEST_KEY = "TEST"
+ALLOW_TEST_KEY_ENV = "TT_ALLOW_TEST_KEY"
+
+
+class TestKeyRefused(RuntimeError):
+    """The resolved OBA key is the shared public one, and that was not opted into."""
+
+
+def _assert_real_oba_key(config: TransitConfig) -> None:
+    """Refuse to start on the shared public OneBusAway key unless told to.
+
+    OneBusAway publishes a demo key literally called ``TEST``. Both key
+    resolution sites in this codebase end their chain with ``or "TEST"``, so a
+    missing or unreadable ``service.yaml`` yields a service that starts
+    cleanly, polls happily, and gets aggressively rate-limited — whose symptom
+    on the sign (every departure showing scheduled, none live) is
+    indistinguishable from a genuine upstream feed outage. Telling those two
+    apart took a direct probe of the OBA API.
+
+    Raising is the idiomatic fatal here: it propagates out of the service
+    entrypoint, the process exits non-zero, and the container restart policy is
+    the supervisor.
+
+    ``TT_ALLOW_TEST_KEY=1`` opts in deliberately — ``tests/test_container.py``
+    sets it, because that suite boots the image with no key and no config mount
+    on purpose, to prove the container comes up keyless.
+    """
+    if os.environ.get(ALLOW_TEST_KEY_ENV, "").strip() in ("1", "true", "yes"):
+        return
+    key = config.service.oba_api_key or os.environ.get("OBA_API_KEY") or SHARED_TEST_KEY
+    if key != SHARED_TEST_KEY:
+        return
+    raise TestKeyRefused(
+        "Refusing to start on the shared public OneBusAway %r key. It is "
+        "rate-limited, and its symptom — every departure rendered as scheduled "
+        "with no live marker — looks exactly like an upstream outage, so this "
+        "fails silently on the sign. Set oba_api_key in service.yaml (or "
+        "OBA_API_KEY in the environment), or set %s=1 to accept the shared key "
+        "deliberately." % (SHARED_TEST_KEY, ALLOW_TEST_KEY_ENV)
+    )
+
+
 async def run_full_service():
     """Run the proxy, web server, and (in cloud mode) the verification monitor
     in a single asyncio event loop.
@@ -190,6 +232,9 @@ async def run_full_service():
         config = TransitConfig.load(path)
     else:
         config = TransitConfig.load()
+
+    # Before anything binds a port or polls upstream.
+    _assert_real_oba_key(config)
 
     server = TransitServer(config)
 

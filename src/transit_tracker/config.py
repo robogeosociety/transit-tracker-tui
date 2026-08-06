@@ -104,7 +104,18 @@ def load_service_settings() -> ServiceSettings:
                 data = yaml.safe_load(f) or {}
                 return ServiceSettings.model_validate(data)
         except Exception:
-            pass
+            # Previously a bare `pass`. Malformed YAML, a validation error or a
+            # permissions problem all degraded to all-defaults — including
+            # oba_api_key=None, which becomes the shared TEST key downstream.
+            # The service then ran on a throttled feed with no indication why.
+            # Still non-fatal (the caller decides), but never again silent.
+            log.error(
+                "Could not load service settings from %s — falling back to "
+                "defaults, which means NO OBA API key",
+                path,
+                exc_info=True,
+                extra={"component": "config"},
+            )
     return ServiceSettings()
 
 
