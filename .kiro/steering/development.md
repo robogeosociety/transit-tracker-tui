@@ -22,16 +22,17 @@ The TUI simulator (`transit-tracker simulator`) is the primary UAT tool during d
 
 Jupyter notebooks live alongside scripts for data processing tasks (walkshed generation, GTFS analysis, route mapping). Use Playwright for browser-based validation of web endpoints (`/walkshed`, `/simulator`, `/spec`).
 
-All code changes are tested here first. Run `uv run pytest -v -m "not docker"` before pushing.
+All code changes are tested here first. Run `uv run pytest -v -m "not e2e"` before pushing.
 
-### Container (Production)
+### Production
 
-The Docker container (`transit-tracker:latest`) is the live production deployment. It runs with `--restart=always` via OrbStack and auto-starts on login.
+A native launchd agent on the Mac mini (`org.eastsideurbanism.transit-tracker`), installed by
+`scripts/install_agent.sh`. `KeepAlive` is the supervisor; the agent auto-starts on login.
 
-- Ports: 8000 (WS), 8081→8080 (HTTP)
-- Config: `.local/home.yaml` mounted at `/config/config.yaml`
-- Status: `curl http://localhost:8081/api/status`
-- Logs: `docker logs transit-tracker`
+- Ports: 8000 (WS), 8080 (HTTP) — bound on `0.0.0.0`, no port mapping
+- Config: `~/.local/share/transit-tracker/config/` via `SERVICE_SETTINGS_PATH` / `PROFILES_DIR`
+- Status: `launchctl list | grep transit-tracker`, `curl http://localhost:8080/transit-tracker`
+- Logs: `~/Library/Logs/transit-tracker.log`
 
 **Do not rebuild, restart, or touch the production container unless explicitly instructed.** It is serving the physical transit board and connected ESP32 hardware.
 
@@ -40,30 +41,29 @@ The container is the final UAT phase in a spec job. After all tasks pass locally
 ## Spec Task Lifecycle
 
 1. Implement and test locally (Python server, pytest, Playwright)
-2. All non-docker tests pass
+2. All tests pass (`-m "not e2e"`)
 3. Run TUI simulator (`transit-tracker simulator`) for visual UAT during development
-4. When instructed: rebuild image, recreate container, verify on live hardware
+4. When instructed: redeploy with `scripts/install_agent.sh`, verify on live hardware
 5. UAT confirmation from user completes the spec
 
 ## Tools
 
 | Tool | Purpose |
 |------|---------|
-| `uv run pytest` | Unit/integration tests (exclude `docker` marker for local) |
-| `uv run pytest -m docker` | Container integration tests (ports 18000/18080) |
+| `uv run pytest -m "not e2e"` | Unit/integration tests |
 | Jupyter notebooks | Data processing, walkshed generation, GTFS analysis |
 | Playwright | Browser validation of web endpoints |
-| `scripts/verify_cloud_equivalence.py` | Compare local/container against reference |
-| `scripts/start_container.sh --detach` | Start production container |
-| `scripts/stop_container.sh` | Stop production container |
+| `scripts/verify_cloud_equivalence.py` | Compare the local service against the cloud baseline |
+| `scripts/install_agent.sh` | Install/redeploy the production launchd agent |
+| `scripts/rotate_log.sh` | Rotate `~/Library/Logs/transit-tracker.log` |
 
 ## Service Management
 
-The CLI manages the service via Docker first, launchctl fallback:
+The CLI manages the launchd agent:
 
 ```
-transit-tracker service start    # docker start transit-tracker
-transit-tracker service stop     # docker stop transit-tracker
-transit-tracker service restart  # docker restart transit-tracker
-transit-tracker service status   # docker inspect state
+transit-tracker service start    # launchctl load
+transit-tracker service stop     # launchctl unload
+transit-tracker service restart  # launchctl kickstart -k
+transit-tracker service status   # launchctl list
 ```

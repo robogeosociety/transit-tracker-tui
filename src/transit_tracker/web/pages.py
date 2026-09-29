@@ -65,8 +65,8 @@ def generate_logs_html() -> str:
     Polls /api/logs (the in-memory ring buffer) and appends entries to a
     scrolling list. This is the only observability view kept in-app after
     the dashboard + network monitor were retired in favor of Grafana —
-    it exists for ad-hoc debugging when you don't want to open Grafana or
-    shell into the container for `docker logs`.
+    it exists for ad-hoc debugging when you don't want to tail
+    ``~/Library/Logs/transit-tracker.log`` on the host.
     """
     return r"""<!DOCTYPE html>
 <html lang="en">

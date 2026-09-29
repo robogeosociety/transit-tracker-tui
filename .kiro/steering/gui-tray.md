@@ -155,15 +155,14 @@ inclusion: auto
 - Client list updates only when the set of client addresses changes (diffed via sorted address string)
 - Profiles menu rebuilds when the profile list changes or every ~10 seconds for trip freshness
 
-## Container Monitoring
+## Service Monitoring
 
-- The GUI polls `http://localhost:8081/api/status` every 2 seconds (same timer as local state)
-- The `/api/status` endpoint is served by the container's web server (`web.py`) and reads `service_state.json` live on each request (strips `last_message` to keep it lean)
-- Container submenu shows: uptime, message count, refresh interval, throttle stats, and per-client details with subscription counts
-- Restart/Stop Container buttons run `docker restart`/`docker stop` in background threads to avoid blocking the UI
-- When the container is stopped, the submenu shows "Not running" and the restart button label changes to "Start Container"
-- Container icon switches to 📵 when the container's `is_rate_limited` is true
-- Docker maps container port 8080 → host 8081
+- The GUI polls `http://localhost:8080/api/status` every 2 seconds (same timer as local state)
+- The `/api/status` endpoint is served by the service's web server (`web.py`) and reads `service_state.json` live on each request (strips `last_message` to keep it lean)
+- The service submenu shows: uptime, message count, refresh interval, throttle stats, and per-client details with subscription counts
+- Restart/Stop buttons drive the launchd agent in background threads to avoid blocking the UI
+- When the service is stopped, the submenu shows "Not running" and the restart button label changes to "Start Service"
+- The icon switches to 📵 when `is_rate_limited` is true
 
 ## Service State File
 
@@ -190,7 +189,7 @@ inclusion: auto
 
 ## Dependencies
 
-- `rumps` — macOS menu bar framework (must run on macOS, not in Docker)
+- `rumps` — macOS menu bar framework (macOS-only; not actually a declared dependency, see the proposal)
 - `websockets` — sync client for initial trip fetch
 - Reads from: `config.py` (`list_profiles`, `get_last_config_path`, `set_last_config_path`), `cli.py` (`PLIST_NAME`, `get_service_status`), `display.py` (`format_trip_line`)
 
@@ -198,4 +197,4 @@ inclusion: auto
 
 - Restart: unloads/reloads the LaunchAgent plist at `~/Library/LaunchAgents/{PLIST_NAME}`
 - Shutdown: unloads plist + sends SIGTERM to the proxy PID from state file, then quits the rumps app
-- The GUI is macOS-only and is not included in the Docker container
+- The GUI is macOS-only and is not started by the launchd service agent

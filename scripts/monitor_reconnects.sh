@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Capture 2h of transit-tracker container logs, then analyze reconnect/handshake
-# patterns. Writes raw logs + summary to /tmp/transit-monitor-<timestamp>/.
+# Capture 2h of transit-tracker logs, then analyze reconnect/handshake patterns.
+# Writes raw logs + summary to /tmp/transit-monitor-<timestamp>/.
+#
+# Tails the launchd agent's log file (the Docker path was retired 2026-09-21).
+# Override with TT_LOG when running against another host's copy.
 
 set -euo pipefail
 
@@ -10,8 +13,10 @@ mkdir -p "$OUTDIR"
 RAW="$OUTDIR/raw.log"
 SUMMARY="$OUTDIR/summary.txt"
 
-echo "Capturing ${DURATION_SECS}s of logs from transit-tracker → $RAW"
-docker logs -f --timestamps transit-tracker >"$RAW" 2>&1 &
+TT_LOG="${TT_LOG:-$HOME/Library/Logs/transit-tracker.log}"
+
+echo "Capturing ${DURATION_SECS}s of logs from $TT_LOG → $RAW"
+tail -n 0 -F "$TT_LOG" >"$RAW" 2>&1 &
 LOG_PID=$!
 trap 'kill $LOG_PID 2>/dev/null || true' EXIT
 

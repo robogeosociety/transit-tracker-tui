@@ -44,13 +44,14 @@ def test_cli_main_simulator_launch():
 
 
 def test_service_start_idempotency():
-    """Verifies that 'service start' does nothing if the container is already running."""
-    mock_inspect = MagicMock()
-    mock_inspect.returncode = 0
-    mock_inspect.stdout = "true"
+    """Verifies that 'service start' does nothing if the agent is already loaded."""
+    mock_list = MagicMock()
+    mock_list.returncode = 0
+    mock_list.stdout = ""
 
     with (
-        patch("subprocess.run", return_value=mock_inspect) as mock_run,
+        patch("subprocess.run", return_value=mock_list) as mock_run,
+        patch("os.system") as mock_system,
         patch("argparse.ArgumentParser.parse_args") as mock_args,
     ):
         mock_args.return_value = MagicMock()
@@ -58,25 +59,17 @@ def test_service_start_idempotency():
 
         main()
 
-        # Should have checked container status but not called docker start
-        # (the "already running" path prints a message and returns)
-        start_calls = [
-            c
-            for c in mock_run.call_args_list
-            if "start" in str(c) and "docker" in str(c)
-        ]
-        # docker inspect is called, but docker start should not be
-        assert not any("docker', 'start'" in str(c) for c in mock_run.call_args_list)
+        # launchctl list is consulted; nothing is loaded and docker is never touched
+        assert any("launchctl" in str(c) for c in mock_run.call_args_list)
+        assert not any("docker" in str(c) for c in mock_run.call_args_list)
+        mock_system.assert_not_called()
 
 
 def test_service_stop_cleanup():
-    """Verifies that 'service stop' stops the container."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "true"
-
+    """Verifies that 'service stop' unloads the agent, never docker."""
     with (
-        patch("subprocess.run", return_value=mock_result) as mock_run,
+        patch("subprocess.run", return_value=MagicMock(returncode=0)) as mock_run,
+        patch("os.system") as mock_system,
         patch("argparse.ArgumentParser.parse_args") as mock_args,
     ):
         mock_args.return_value = MagicMock()
@@ -84,7 +77,5 @@ def test_service_stop_cleanup():
 
         main()
 
-        # Should have called docker stop
-        all_calls = [str(c) for c in mock_run.call_args_list]
-        docker_stop = any("docker" in c and "stop" in c for c in all_calls)
-        assert docker_stop
+        assert any("launchctl unload" in str(c) for c in mock_system.call_args_list)
+        assert not any("docker" in str(c) for c in mock_run.call_args_list)

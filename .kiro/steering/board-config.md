@@ -16,19 +16,20 @@ Configuration is split into two concerns:
 Pure subscription data under the `transit_tracker:` key. These match the public reference schema and contain only stops, routes, display preferences, and abbreviations. No API keys, no polling intervals, no hardware config.
 
 ### 2. Service Settings (`.local/service.yaml`, gitignored)
-Dev environment and instance settings: API credentials (`oba_api_key`), polling intervals (`check_interval_seconds`, `request_spacing_ms`), hardware config (`num_panels`, `panel_width`, `panel_height`), filtering (`arrival_threshold_minutes`), and service mode flags (`use_local_api`, `auto_launch_gui`). The `ServiceSettings` Pydantic model validates these. For Docker containers, use environment variables (e.g., `OBA_API_KEY`) instead. Falls back to `~/.config/transit-tracker/settings.yaml` for legacy installs.
+Dev environment and instance settings: API credentials (`oba_api_key`), polling intervals (`check_interval_seconds`, `request_spacing_ms`), hardware config (`num_panels`, `panel_width`, `panel_height`), filtering (`arrival_threshold_minutes`), and service mode flags (`use_local_api`, `auto_launch_gui`). The `ServiceSettings` Pydantic model validates these; `SERVICE_SETTINGS_PATH`, `PROFILES_DIR` and `GTFS_DB_PATH` override the paths they load from. Falls back to `~/.config/transit-tracker/settings.yaml` for legacy installs.
 
 At runtime, `TransitConfig` loads both and merges them into a single composite object. Access board settings via `config.transit_tracker.*` and service settings via `config.service.*`.
 
 ## Running Services
 
-The transit tracker runs as a Docker container in production, or as local Python processes in development:
+The transit tracker runs as a native launchd agent in production, or as local Python processes
+in development:
 
-**Production (container):**
-- `docker ps` — check container status
-- `transit-tracker service [start|stop|restart|status]` — manages the Docker container
-- Container runs WebSocket (:8000) + HTTP (:8080, mapped to host :8081)
-- `--restart=always` via OrbStack, auto-starts on login
+**Production (launchd, Mac mini):**
+- `launchctl list | grep transit-tracker` — check agent state
+- `transit-tracker service [start|stop|restart|status]` — manages the launchd agent
+- Serves WebSocket (:8000) + HTTP (:8080) from one asyncio process on `0.0.0.0`
+- `KeepAlive` is the supervisor, auto-starts on login
 
 **Development (local Python):**
 - `uv run transit-tracker service` — WebSocket proxy + web server + GUI tray
