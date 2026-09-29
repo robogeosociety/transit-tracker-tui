@@ -181,6 +181,59 @@ Alternatively, you can run the service directly in the foreground for debugging:
 transit-tracker service
 ```
 
+### 3. Always-on: run it as a LaunchDaemon (headless Mac)
+
+The TUI's "Start Service" button writes a **user LaunchAgent**
+(`~/Library/LaunchAgents/org.eastsideurbanism.transit-tracker.plist`). A user agent
+only runs while that user is logged in — which is the wrong shape for a headless
+always-on host. On our Mac mini FileVault stays on and a remote reboot is
+`sudo fdesetup authrestart`: it unlocks the disk once and boots **to the login
+window**, with no user session at all. LaunchDaemons run there; LaunchAgents do
+not. The LED sign has to come back after a reboot without anyone logging in, so
+the proxy runs as a daemon.
+
+`deploy/launchd/` holds that variant:
+
+| File | Installed to |
+|---|---|
+| `org.eastsideurbanism.transit-tracker.plist` | `/Library/LaunchDaemons/` (root:wheel 0644) |
+| `transit-tracker-daemon` | `/usr/local/libexec/` (root:wheel 0755) |
+| `install-daemon.sh` | run in place |
+
+The daemon keeps `UserName tommydoerr` / `GroupName staff`, so the process is
+still the ordinary service user with its ordinary `~/.local/share/transit-tracker/app`
+install — only the *loading* moves to `system/`. Because launchd hands a daemon a
+nearly empty environment, the plist sets `HOME`, `USER` and a `PATH` that includes
+`~/.local/bin` (uv-managed CPython 3.14) and `/opt/homebrew/bin` explicitly, plus
+`RunAtLoad`, `KeepAlive` and logs under `/Users/tommydoerr/Library/Logs/`.
+
+**No login-keychain or TCC-protected paths.** At the login window there is no
+unlocked login keychain and no user to approve a TCC prompt, so the service must
+never read Documents/Desktop/Downloads/iCloud Drive or a keychain item. Everything
+it needs lives under `~/.local/share/transit-tracker/` (the app and its
+`.local/service.yaml`) or `~/.config/transit-tracker/` (the legacy
+`settings.yaml` fallback) — both outside TCC's protected set.
+
+Install (as `tommydoerr`, with a tty for the `sudo` prompts):
+
+```bash
+~/.local/share/transit-tracker/app/deploy/launchd/install-daemon.sh
+```
+
+It boots out and moves aside the old user agent, `sudo install`s the wrapper and
+the plist, `sudo launchctl bootout`/`bootstrap system` the label, and verifies with
+`sudo launchctl print system/org.eastsideurbanism.transit-tracker`.
+
+Restarting a *system* daemon needs root, so grant just that one verb — with
+`sudo visudo -f /etc/sudoers.d/transit-tracker`:
+
+```
+tommydoerr ALL=(root) NOPASSWD: /bin/launchctl kickstart -k system/org.eastsideurbanism.transit-tracker
+```
+
+That lets the Discord bot and the CI runner bounce the sign without a password,
+and nothing else.
+
 ## ⚙️ Configuration
 
 Configuration is saved in a local `config.yaml` file in your current working directory when saving from the TUI.
