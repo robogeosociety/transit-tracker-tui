@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchDaemon variant of the transit-tracker proxy.
+
+  Installed to /Library/LaunchDaemons/org.eastsideurbanism.transit-tracker.plist
+  by deploy/launchd/install-daemon.sh. Unlike the user LaunchAgent this replaces,
+  a daemon starts at boot with no user session — which is what the always-on Mac
+  mini needs, because it reboots via `sudo fdesetup authrestart` straight to the
+  login window and nobody logs in.
+
+  The process still runs as tommydoerr (UserName/GroupName below) so it keeps
+  using the per-user install at ~/.local/share/transit-tracker/app and writes
+  logs the user can read. It must therefore never touch the login keychain or a
+  TCC-protected path (Documents, Desktop, Downloads, iCloud Drive): at the login
+  window there is no unlocked keychain and no user to approve a TCC prompt.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.eastsideurbanism.transit-tracker</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/libexec/transit-tracker-daemon</string>
+    </array>
+
+    <key>UserName</key>
+    <string>tommydoerr</string>
+    <key>GroupName</key>
+    <string>staff</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/tommydoerr</string>
+        <key>USER</key>
+        <string>tommydoerr</string>
+        <key>PATH</key>
+        <string>/Users/tommydoerr/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>TRANSIT_TRACKER_APP_DIR</key>
+        <string>/Users/tommydoerr/.local/share/transit-tracker/app</string>
+        <key>TT_LOG_LEVEL</key>
+        <string>INFO</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/tommydoerr/.local/share/transit-tracker/app</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>StandardOutPath</key>
+    <string>/Users/tommydoerr/Library/Logs/transit-tracker.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/tommydoerr/Library/Logs/transit-tracker.err.log</string>
+</dict>
+</plist>

@@ -1,0 +1,34 @@
+#!/bin/sh
+# Wrapper launched by /Library/LaunchDaemons/org.eastsideurbanism.transit-tracker.plist.
+# Installed to /usr/local/libexec/transit-tracker-daemon (root-owned, 0755).
+#
+# launchd gives a daemon almost no environment, and a daemon has no login shell
+# to source, so the plist sets HOME/USER/PATH explicitly and this wrapper only
+# resolves the interpreter and execs the long-running proxy. Keep it dependency
+# free: no keychain, no TCC-protected directories, no network at startup.
+set -eu
+
+APP_DIR="${TRANSIT_TRACKER_APP_DIR:-${HOME}/.local/share/transit-tracker/app}"
+
+# Preferred: the app's own virtualenv (uv-managed CPython 3.14 on the mini).
+BIN="${APP_DIR}/.venv/bin/transit-tracker"
+if [ ! -x "$BIN" ]; then
+    # Fallbacks: a uv tool / pipx style install, then anything on PATH.
+    if [ -x "${HOME}/.local/bin/transit-tracker" ]; then
+        BIN="${HOME}/.local/bin/transit-tracker"
+    else
+        BIN="$(command -v transit-tracker || true)"
+    fi
+fi
+
+if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
+    echo "transit-tracker-daemon: no transit-tracker executable found (looked in ${APP_DIR}/.venv/bin, ${HOME}/.local/bin, PATH=${PATH})" >&2
+    exit 78  # EX_CONFIG — KeepAlive will retry after ThrottleInterval
+fi
+
+if [ -d "$APP_DIR" ]; then
+    cd "$APP_DIR"
+fi
+
+echo "transit-tracker-daemon: starting $BIN service (uid=$(id -u) app_dir=$APP_DIR) at $(date -u +%FT%TZ)"
+exec "$BIN" service
