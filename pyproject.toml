@@ -73,8 +73,7 @@ markers = [
     "unit: fast isolated tests with mocked dependencies",
     "integration: tests module interactions with local resources",
     "contract: protocol and data compatibility with reference project",
-    "e2e: full system tests requiring Docker or live endpoints",
-    "docker: marks tests that require Docker (deselect with '-m \"not docker\"')",
+    "e2e: full system tests requiring live endpoints",
 ]
 
 [tool.coverage.run]

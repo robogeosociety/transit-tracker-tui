@@ -450,3 +450,23 @@ async def test_daylight_mode_night_turns_off(daylight_config):
     # Should use turn_off endpoint for brightness=0
     url = mock_client.post.call_args[0][0]
     assert "turn_off" in url
+
+
+# ---------------------------------------------------------------------------
+# device_ip follows the connected ESP32 (its DHCP lease moves)
+# ---------------------------------------------------------------------------
+
+
+def test_device_ip_follows_connected_esp32(daylight_config):
+    from transit_tracker.network.websocket_server import TransitServer
+
+    server = TransitServer(daylight_config)
+    assert server._resolve_device_ip() == "192.168.5.248"  # static fallback
+
+    server._note_device_addr(("192.168.4.41", 64854), "ESP32 Websocket Client")
+    assert server._resolve_device_ip() == "192.168.4.41"
+
+    # Browsers and the in-process TileCache never count as the board
+    server._note_device_addr(("192.168.5.188", 1), "Mozilla/5.0")
+    server._note_device_addr(("127.0.0.1", 0), "ESP32 Websocket Client")
+    assert server._resolve_device_ip() == "192.168.4.41"

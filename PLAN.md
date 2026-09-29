@@ -67,7 +67,8 @@ communication happens only through `tt_core` types and the `service_state.json` 
 - [ ] `tt_proxy/gtfs.py` — move `gtfs_schedule.py` wholesale
 - [ ] `tt_proxy/throttle.py` — extract rate-limit/backoff + `throttle_log.jsonl` writer from `websocket_server.py:96` area
 - [ ] `tt_proxy/__main__.py` — `python -m tt_proxy` entry point (pure asyncio, no dimming)
-- [ ] `tt_proxy/container/` — move `Dockerfile`, `docker/` contents, `scripts/start_container.sh`, `scripts/stop_container.sh`, `scripts/download_gtfs.py`, `scripts/verify_launch.py`
+- [ ] ~~`tt_proxy/container/`~~ — **obsolete:** the container was retired 2026-09-21 (PR #76);
+      the deployment unit is a launchd agent (`scripts/install_agent.sh`). Original text: move `Dockerfile`, `docker/` contents, `scripts/start_container.sh`, `scripts/stop_container.sh`, `scripts/download_gtfs.py`, `scripts/verify_launch.py`
 - [ ] `tt_proxy/container/compose.yaml` — new compose file: `tt-proxy` service, volumes for `service_state.json` + `gtfs_index.sqlite`, env vars (`OBA_API_KEY`, `GTFS_DB_PATH`, `TT_STATE_DIR`, `TT_LOG_LEVEL`), colima/docker-desktop agnostic for Mac
 - [ ] Leave `src/transit_tracker/network/websocket_server.py` and `transit_api.py` and `gtfs_schedule.py` as re-export shims
 - [ ] Verify: `test_network.py`, `test_transit_api.py`, `test_gtfs.py`, `test_proxy_equivalence.py`, `test_cloud_equivalence.py`, `test_metrics.py`, `test_container.py` green

@@ -7,7 +7,7 @@ import re
 import time
 import zoneinfo
 from collections import defaultdict
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 import websockets
@@ -141,6 +141,11 @@ class TransitServer:
         self.subscriptions = {} # ws -> List[Dict] (pairs)
         self.client_names = {} # ws -> str
         self.client_limits = {} # ws -> int
+        # LAN address of the ESP32 that most recently connected. The board is a
+        # DHCP client whose lease moves (it went .33 -> .41 on 2026-09-21), so the
+        # dimming REST calls follow the live peer instead of the static
+        # ``service.device_ip``, which is now only a fallback for before it connects.
+        self.device_addr: Optional[str] = None
 
         # Centralized cache for arrivals
         # stop_id -> (timestamp, List[arrivals])
@@ -436,6 +441,7 @@ class TransitServer:
             addr, ua, origin, path,
             extra={"component": "server", "client": f"{addr[0]}:{addr[1]}", "ua": ua, "origin": origin, "path": path},
         )
+        self._note_device_addr(addr, ua)
         self.sync_state()
         try:
             async for message in ws:
@@ -786,10 +792,29 @@ class TransitServer:
         except Exception:
             pass
 
+    def _note_device_addr(self, addr, ua: str) -> None:
+        """Remember the ESP32's current LAN address from its WebSocket peer."""
+        ip = addr[0] if addr else None
+        if not ip or ip == "127.0.0.1" or "esp32" not in (ua or "").lower():
+            return
+        configured = self.config.service.device_ip if self.config else None
+        if ip != self.device_addr:
+            if configured and ip != configured:
+                log.info(
+                    "ESP32 connected from %s (service.yaml device_ip is %s); "
+                    "using %s for brightness",
+                    ip, configured, ip, extra={"component": "server"},
+                )
+            self.device_addr = ip
+
+    def _resolve_device_ip(self) -> Optional[str]:
+        """Live ESP32 peer address, else the static ``service.device_ip``."""
+        return self.device_addr or self.config.service.device_ip
+
     async def _apply_dimming_schedule(self, http_client: httpx.AsyncClient):
         """Single iteration of dimming schedule check. Returns True if brightness changed."""
         svc = self.config.service
-        device_ip = svc.device_ip
+        device_ip = self._resolve_device_ip()
 
         if svc.daylight_dimming_enabled:
             try:

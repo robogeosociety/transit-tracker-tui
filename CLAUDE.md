@@ -79,7 +79,7 @@ transit-tracker web     # start HTTP web server with log tail, simulator, and RE
 | `observability/influxdb_writer.py` | Background InfluxDB writer — mirrors counters/gauges/trips to the local Influx bucket for Grafana. No-op when `INFLUXDB_TOKEN` is unset |
 | `tui.py` | `rich`/`questionary` interactive configurator — config files, device flashing, profiles, brightness |
 | `simulator.py` | 64×32 LED matrix emulator with BDF fonts |
-| `cli.py` | Entry point; `manage_service()` uses Docker/launchctl for daemon lifecycle |
+| `cli.py` | Entry point; `manage_service()` drives the launchd agent |
 
 ### Web API (all under `/transit-tracker/`)
 
@@ -124,14 +124,22 @@ transit-tracker web     # start HTTP web server with log tail, simulator, and RE
 
 ## Service management
 
-The service runs as a Docker container with `--restart=always`. See `.kiro/steering/docker.md` for full container context.
+The service runs natively on the Mac mini under launchd as
+`org.eastsideurbanism.transit-tracker` — `scripts/install_agent.sh` stages the app to
+`~/.local/share/transit-tracker/app`, builds the uv venv, writes the plist and asserts it
+loaded. Docker was retired 2026-09-21; see
+`docs/proposals/native-launchd-transit-tracker.md`.
 
 ```bash
-transit-tracker service start     # docker start transit-tracker
-transit-tracker service stop      # docker stop transit-tracker
-transit-tracker service restart   # docker restart transit-tracker
-transit-tracker service status    # docker inspect state
+scripts/install_agent.sh          # install or redeploy (--clean rebuilds the venv)
+transit-tracker service start     # launchctl load
+transit-tracker service stop      # launchctl unload
+transit-tracker service restart   # launchctl kickstart -k
+transit-tracker service status    # launchctl list
 ```
+
+Logs are `~/Library/Logs/transit-tracker.log` (rotate with `scripts/rotate_log.sh`). The line
+that proves the *sign* works is `Push to <esp32-ip>` — a healthy `launchctl list` does not.
 ## Pull requests — the "newspaper" framework
 
 PR descriptions follow the **newspaper / information-pyramid** format: one self-contained

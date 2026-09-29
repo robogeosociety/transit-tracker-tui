@@ -1,6 +1,8 @@
 ---
 type: proposal
-implemented_by: []
+status: implemented
+implemented_by: [76]
+implemented_on: 2026-09-21
 tracking: 0
 ---
 

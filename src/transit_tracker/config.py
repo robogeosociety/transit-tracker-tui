@@ -198,7 +198,7 @@ def set_last_config_path(path: str):
 def list_profiles() -> List[str]:
     """Lists available .yaml config files in project root and .local/.
 
-    When PROFILES_DIR is set (e.g. inside a Docker container), scans that
+    When PROFILES_DIR is set (as the launchd agent does), scans that
     directory instead of the project tree.
     """
     _EXCLUDE = {"service.yaml", "service_state.json", "test_isolation_config.yaml"}

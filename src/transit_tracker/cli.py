@@ -15,100 +15,24 @@ log = get_logger("transit_tracker.cli")
 
 PLIST_NAME = "org.eastsideurbanism.transit-tracker.plist"
 PLIST_PATH = os.path.expanduser(f"~/Library/LaunchAgents/{PLIST_NAME}")
-CONTAINER_NAME = "transit-tracker"
-
-
-def _container_running() -> bool:
-    """Check if the transit-tracker Docker container is running."""
-    res = subprocess.run(
-        ["docker", "inspect", "-f", "{{.State.Running}}", CONTAINER_NAME],
-        capture_output=True,
-        text=True,
-    )
-    return res.returncode == 0 and "true" in res.stdout.lower()
+INSTALL_HINT = "Run 'scripts/install_agent.sh' first."
 
 
 def get_service_status():
-    """Returns True if the service is running (container or launchctl)."""
-    if _container_running():
-        return True
+    """Returns True if the launchd agent is loaded."""
     label = PLIST_NAME.replace(".plist", "")
     res = subprocess.run(["launchctl", "list", label], capture_output=True, text=True)
     return res.returncode == 0
 
 
 def manage_service(action: str):
-    """Manage the transit-tracker service.
+    """Manage the transit-tracker launchd agent.
 
-    Prefers Docker container management. Falls back to launchctl for
-    legacy non-containerised setups.
+    The service runs natively under launchd (``scripts/install_agent.sh``);
+    the Docker path was retired 2026-09-21 — see
+    ``docs/proposals/native-launchd-transit-tracker.md``.
     """
-    # If a container exists (running or stopped), manage via Docker
-    res = subprocess.run(
-        ["docker", "inspect", CONTAINER_NAME],
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode == 0:
-        _manage_service_docker(action)
-    else:
-        _manage_service_launchctl(action)
-
-
-def _manage_service_docker(action: str):
-    if action == "start":
-        if _container_running():
-            print(f"[yellow]Container {CONTAINER_NAME} is already running.[/yellow]")
-            return
-        print(f"Starting container {CONTAINER_NAME}...")
-        result = subprocess.run(
-            ["docker", "start", CONTAINER_NAME],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            print(f"[green]Container {CONTAINER_NAME} started.[/green]")
-        else:
-            print(f"[red]Failed to start: {result.stderr.strip()}[/red]")
-
-    elif action == "stop":
-        print(f"Stopping container {CONTAINER_NAME}...")
-        result = subprocess.run(
-            ["docker", "stop", CONTAINER_NAME],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            print(f"[green]Container {CONTAINER_NAME} stopped.[/green]")
-        else:
-            print(f"[red]Failed to stop: {result.stderr.strip()}[/red]")
-
-    elif action == "restart":
-        print(f"Restarting container {CONTAINER_NAME}...")
-        result = subprocess.run(
-            ["docker", "restart", CONTAINER_NAME],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            print(f"[green]Container {CONTAINER_NAME} restarted.[/green]")
-        else:
-            print(f"[red]Failed to restart: {result.stderr.strip()}[/red]")
-
-    elif action == "status":
-        if _container_running():
-            # Get uptime from container inspect
-            res = subprocess.run(
-                ["docker", "inspect", "-f", "{{.State.StartedAt}}", CONTAINER_NAME],
-                capture_output=True,
-                text=True,
-            )
-            started = res.stdout.strip() if res.returncode == 0 else "unknown"
-            print(
-                f"● {CONTAINER_NAME} is [bold green]running[/bold green] (since {started})"
-            )
-        else:
-            print(f"○ {CONTAINER_NAME} is [red]stopped[/red]")
+    _manage_service_launchctl(action)
 
 
 def _manage_service_launchctl(action: str):
@@ -126,7 +50,7 @@ def _manage_service_launchctl(action: str):
             os.system(f"launchctl load {PLIST_PATH}")
         else:
             print(
-                f"[red]Error: {PLIST_PATH} not found. Run 'transit-tracker install' first.[/red]"
+                f"[red]Error: {PLIST_PATH} not found. {INSTALL_HINT}[/red]"
             )
 
     elif action == "stop":
